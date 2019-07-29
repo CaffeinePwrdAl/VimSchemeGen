@@ -346,11 +346,48 @@ function SetActiveColor(index)
 body {
 	font-family: "Arial", "Noto Sans", sans-serif;
 	color: #dcdccc;
+	background: #000000;
+}
+h1 {
+	padding: 0.2em 0 0.1em 0;
+	margin: 0 0.2em 0 0.2em;
+	border-bottom: 1px solid whitesmoke;
+}
+.section {
+	padding: 1em 0 1em 0;
+	margin: 0 1em 0 1em;
+	margin-bottom: 1em;
+	padding-bottom: 1em;
+}
+.left {
+	width: 50%;
+	float: left;
+}
+.right {
+	width: 50%;
+	float: right;
+}
+.inner {
+	margin: 0.5em;
+	padding: 0.5em;
 	background: #161616;
 }
+.clear {
+	clear: both;
+}
+.sliders {
+	width: 48%;
+    display: inline-block;
+	background: #212122;
+	border: none;
+}
 .slider {
-    width: 512px;
-    height: 32px;
+	float: right;
+    min-width: 512px;
+	width: 80%;
+}
+.swatcharea {
+	padding: 1em;
 }
 .swatch {
 	color: #161616;
@@ -367,6 +404,8 @@ body {
 }
 .code {
 	font-family: "Noto Sans Mono", monospace;
+	padding: 1em;
+
 }
 .indent {
 	margin-left: 3em;
@@ -375,49 +414,64 @@ body {
 </head>
 <body class="bg" onload="ApplyColors()">
 
-<h1>Swatches</h1>
-<div id="ColorPanel"></div>
-<div>
-    <input class="slider" id="hue" type="range" min="0" max="360" value="0" oninput="UpdateColor();"/>
-    <input class="slider" id="sat" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/>
-    <input class="slider" id="lum" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/>
-</div>
-
-<h1>Syntax</h1>
-<div id="SyntaxPanel"></div>
-
-<h1>Scheme Preview</h1>
-
-<div class="code fg bg">
-<div><span class="Include">#include </span><span class="String">&lt;something.h&gt;</span></div>
-<div><span class="PreProc">#define STRINGIFY(x) ##x</span></div>
-<div class="Comment">// Comment comment, something comment</div>
-<div class="Comment">/* Comment comment comment comment */</div>
-<div><span class="Type">float</span> fSomething = <span class="Float">0.0f</span>;</div>
-<div><span class="Type">int</span> <span>main</span>(<span class="Type">int</span> <span>argc</span>, <span class="Type">char</span><span>**</span> <span>argv</span>)</div>
-<div>{</div>
-<div class="indent">
-	<div><span class="Statement">for</span>(<span class="Type">int</span> i = <span class="Number">0</span>; i &lt; something; i++)</div>
-	<div>{</div>
-	<div class="indent">
-		<div><span class="Conditional">if</span> (<span class="Constant">true</span>)</span></div>
-		<div>{</div>
-		<div class="indent">
-			<div><span>printf</span>(<span class="String">"Hello, world!\n"</span>);</div>
+<div class="section">
+	<div class="left"><div class="inner">
+		<h1>Scheme Preview</h1>
+		<div class="code fg bg">
+			<div><span class="Include">#include </span><span class="String">&lt;something.h&gt;</span></div>
+			<div><span class="PreProc">#define STRINGIFY(x) ##x</span></div>
+			<div class="Comment">// Comment comment, something comment</div>
+			<div class="Comment">/* Comment comment comment comment */</div>
+			<div><span class="Type">float</span> fSomething = <span class="Float">0.0f</span>;</div>
+			<div><span class="Type">int</span> <span>main</span>(<span class="Type">int</span> <span>argc</span>, <span class="Type">char</span><span>**</span> <span>argv</span>)</div>
+			<div>{</div>
+			<div class="indent">
+				<div><span class="Statement">for</span>(<span class="Type">int</span> i = <span class="Number">0</span>; i &lt; something; i++)</div>
+				<div>{</div>
+				<div class="indent">
+					<div><span class="Conditional">if</span> (<span class="Constant">true</span>)</span></div>
+					<div>{</div>
+					<div class="indent">
+						<div><span>printf</span>(<span class="String">"Hello, world!\n"</span>);</div>
+					</div>
+					<div>}</div>
+				</div>
+				<div>}</div>
+				<div><span class="Conditional">switch</span>(something)</div>
+				<div>{</div>
+				<div class="indent">
+					<div><span class="Label">default:</span></div>
+					<div><span class="Label">case</span> <span class="Number">0</span>:</div>
+				</div>
+				<div>}</div>
+				<div><span class="Statement">return</span> <span class="Number">0</span>;</div>
+			</div>
+			<div>}</div>
 		</div>
-		<div>}</div>
-	</div>
-	<div>}</div>
-	<div><span class="Conditional">switch</span>(something)</div>
-	<div>{</div>
-	<div class="indent">
-		<div><span class="Label">default:</span></div>
-		<div><span class="Label">case</span> <span class="Number">0</span>:</div>
-	</div>
-	<div>}</div>
-	<div><span class="Statement">return</span> <span class="Number">0</span>;</div>
+	</div></div>
+	<div class="right"><div class="inner">
+		<h1>Syntax Mapping</h1>
+		<div id="SyntaxPanel" class="swatcharea"></div>
+	</div></div>
+	<div class="clear"></div>
 </div>
-<div>}</div>
-</div>
+
+<div class="section"><div class="inner">
+	<h1>Swatches</h1>
+	<div id="ColorPanel" class="swatcharea"></div>	
+	<fieldset class="sliders">
+		<h3>Swatch Adjustment</h3>
+		<p><label for="hue">Hue</label>><input class="slider" id="hue" type="range" min="0" max="360" value="0" oninput="UpdateColor();"/></p>
+		<p><label for="sat">Saturation</label><input class="slider" id="sat" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/></p>
+		<p><label for="lum">Lightness</label><input class="slider" id="lum" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/></p>
+	</fieldset>
+	<fieldset class="sliders">
+		<h3>Global Adjustment</h3>
+		<p><label for="sat">Global Saturation</label><input class="slider" id="sat" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/></p>
+		<p><label for="lum">Global Luminance</label><input class="slider" id="lum" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/></p>
+	</fieldset>
+	<div class="clear"></div>
+</div></div>
+
 </body>
 </html>
