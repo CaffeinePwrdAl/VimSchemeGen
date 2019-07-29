@@ -1,0 +1,423 @@
+<html>
+<head>
+<title>Vim Color Scheme Editor</title>
+<script>
+
+function ToHex(rgb)
+{
+	console.log("RGB, ", rgb);
+	console.log("R, G, B, ", rgb.r, rgb.g, rgb.b);
+	var intr = Math.floor(rgb.r * 255);
+	var intg = Math.floor(rgb.g * 255);
+	var intb = Math.floor(rgb.b * 255);
+	console.log(intr, intg, intb);
+
+	return "#" + ((1<<24) | (intr<<16) | (intg<<8) | intb).toString(16).substr(1);
+}
+
+function ToFloat(hex)
+{
+	var numpart = hex.substring(1);
+	var r = parseInt(numpart.substring(0,2), 16) / 255.0;
+	var g = parseInt(numpart.substring(2,4), 16) / 255.0;
+	var b = parseInt(numpart.substring(4,6), 16) / 255.0;
+	return {r, g, b};
+}
+
+function Linearise(c)
+{
+	if (c <= 0.0031308)
+	{
+		return 12.92 * c;
+	}
+	else
+	{
+		return 1.055 * Math.pow(c, 1.0 / 2.4) - 0.055;
+	}
+}
+
+function GammaCorrect(c)
+{
+	if (c <= 0.04045)
+	{
+		return c / 12.92;
+	}
+	else
+	{
+		return Math.pow((c + 0.055)/1.055, 2.4);
+	}
+}
+
+//-----------------------------------------------------------------------
+// Calculate perceptual luminance of colour
+//-----------------------------------------------------------------------
+function Luminance(c)
+{
+	// Rec.709 D65
+	return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
+
+//-----------------------------------------------------------------------
+// Calculates an RGB colour from HSL
+//-----------------------------------------------------------------------
+function RGBToHSL(c)
+{
+    var max = Math.max(c.r, c.g, c.b);
+    var min = Math.min(c.r, c.g, c.b);
+	var range = max - min;
+
+    var h, s, l;
+	if (c.r == c.g && c.g == c.b)
+	{
+		h = 0;
+	}
+	else if (c.r == max)
+	{
+		h = (c.g - c.b) / range;
+	}
+	else if (c.g == max)
+	{
+		h = 2.0 + (c.b - c.r) / range;
+	}
+	else
+	{
+		h = 4.0 + (c.r - c.g) / range;
+	}
+
+    h = (h * 60.0 + 360.0) % 360.0;
+
+    l = (max + min) / 2.0;
+
+    if (min == 1 || max == 0)
+    {
+        s = 0;
+    }
+    else
+    {
+        s = (max - l) / Math.min(l, 1 - l);
+    }
+
+    return {h, s, l};
+}
+function HSLToRGB(h, s, l)
+{
+	var C = (1.0 - Math.abs(2.0 * l - 1.0)) * s;
+	var X = C * (1.0 - Math.abs( ((h / 60.0) % 2.0) - 1.0));
+	var m = l - C / 2.0;
+
+	var r, g, b;
+	if (h < 60)				r = C, g = X, b = 0;
+	else if (h < 120)		r = X, g = C, b = 0;
+	else if (h < 180)		r = 0, g = C, b = X;
+	else if (h < 240)		r = 0, g = X, b = C;
+	else if (h < 300)		r = X, g = 0, b = C;
+	else					r = C, g = 0, b = X;
+
+	r += m;	g += m;	b += m;
+
+  //  r = GammaCorrect(r);
+    //g = GammaCorrect(g);
+    //b = GammaCorrect(b);
+
+	return {r, g, b};
+}
+
+function SetSliders(hex)
+{
+    var rgb = ToFloat(hex);
+    //rgb.r = Linearise(rgb.r);
+    //rgb.g = Linearise(rgb.g);
+    //rgb.b = Linearise(rgb.b);
+    var hsl = RGBToHSL(rgb);
+
+    console.log("SetSliders: ", hex, rgb, hsl);
+
+    document.getElementById("hue").value = hsl.h;
+    document.getElementById("sat").value = hsl.s * 255;
+    document.getElementById("lum").value = hsl.l * 255;
+}
+
+function UpdateColor()
+{
+    var h = document.getElementById("hue").value;
+    var s = document.getElementById("sat").value / 255.0;
+    var l = document.getElementById("lum").value / 255.0;
+
+    var rgb = HSLToRGB(h, s, l);
+    var hex = ToHex(rgb);
+
+    g_asColors[g_currentColor].color = hex;
+
+    console.log("Update Colour: ", hex, rgb, h, s, l);
+    UpdateColorStyle(g_currentColor);
+}
+
+var g_asBackground = { name: "bg",		color: "#161616" };
+
+// Rules: https://github.com/vim/vim/blob/master/runtime/syntax/c.vim
+//
+// C syntax rules are all called 'cSomething' but initially map to 'standard'
+// highlighting rules such as 'Comment', 'Conditional', 'Type', etc
+//
+// So mostly define based on the standard rules, and overload particular
+// individual rules as required.
+
+var g_asColors = [
+	{ name: "Whiteish", color: "#dcdccc" },
+	{ name: "Name",  color: "#c2b680" },
+	{ name: "Name",  color: "#f8af80" },
+	{ name: "Name",  color: "#c2d0ae" },
+	{ name: "Name",  color: "#e0af91" },
+	{ name: "Name",  color: "#a1c5a1" },
+	{ name: "Name",  color: "#dabfa5" },
+	{ name: "Name",  color: "#d4b064" },
+    { name: "R",  color: "#ff0000" },
+    { name: "G",  color: "#00ff00" },
+    { name: "B",  color: "#0000FF" },
+];
+
+var g_asSyntaxElements = [
+	{ name: "fg",			color: 0 },
+	{ name: "Comment",		color: 1 }, // // and /* */
+	{ name: "Conditional",	color: 2 }, // if else switch
+	{ name: "Constant",		color: 2 }, // INT8_MAX, __LINE__, true/false
+	{ name: "Define",		color: 3 },
+	{ name: "Include",		color: 3 }, // #include
+	{ name: "Float", 		color: 2 }, // 0.0f
+	{ name: "Label", 		color: 4 }, // case default
+	{ name: "Macro",		color: 3 }, // #define
+	{ name: "Number", 		color: 2 }, // 123, octal
+	{ name: "PreProc",		color: 5 }, // #define
+	{ name: "Type",			color: 6 }, // int float uint32_t
+	{ name: "String", 		color: 2 }, // String literals, included file names
+	{ name: "Statement", 	color: 4 }, // goto break return continue asm
+	{ name: "Special",    	color: 7 },
+];
+
+function ColorStyleName(index)
+{
+	return ".color_"+index.toString();
+}
+
+function AddStyle(styleSheet, name, color)
+{
+	console.log("Args: ", name, color);
+	styleSheet.innerHTML += name+"{ color: " + color + ";}";
+	styleSheet.innerHTML += name+"_swatch { background: " + color + ";}";
+}
+
+function AddSyntaxSwatch(panel, name, color)
+{
+	var cssstyle = name+"_swatch";
+	panel.innerHTML += "<div class=\"swatch "+cssstyle+"\">" + 
+						name + "<br/><br/>" + color.toLowerCase() +
+						"</div>";
+}
+
+function AddColorSwatch(panel, index)
+{
+	var c = g_asColors[index];
+	var style = "color_"+index.toString()+"_swatch";
+	var onclick = "onclick=\"SetActiveColor("+index+");\"";
+	var id = "id=\"color_"+index+"\"";
+	panel.innerHTML += "<div "+ id + onclick + "class=\"swatch "+style+"\">" + 
+						c.name + "<br/><br/>" + c.color.toLowerCase() +
+						"</div>";
+}
+
+var g_sColorPanel;
+var g_sStyleSheet;
+
+function ApplyColors()
+{
+	g_sStyleSheet = document.createElement('style');
+	g_sStyleSheet.innerHTML = "";
+
+	var num = g_asSyntaxElements.length;
+	var numc = g_asColors.length;
+
+	for (var i = 0; i < num; i++)
+	{
+		var color = g_asColors[g_asSyntaxElements[i].color];
+		AddStyle(g_sStyleSheet, "."+g_asSyntaxElements[i].name, color.color);
+	}
+	for (var i = 0; i < numc; i++)
+	{
+		AddStyle(g_sStyleSheet, ColorStyleName(i), g_asColors[i].color);
+	}
+	document.body.appendChild(g_sStyleSheet);
+
+	g_sColorPanel = document.getElementById("ColorPanel");
+	g_sSyntaxPanel = document.getElementById("SyntaxPanel");
+
+	for (var i = 0; i < numc; i++)
+	{
+		AddColorSwatch(g_sColorPanel,i);
+	}
+
+	for (var i = 0; i < num; i++)
+	{
+		var color = g_asColors[g_asSyntaxElements[i].color];
+		AddSyntaxSwatch(g_sSyntaxPanel,
+						g_asSyntaxElements[i].name,
+						color.color);
+	}
+}
+
+function UpdateRuleColor(name, hex)
+{
+    var rules = g_sStyleSheet.sheet.cssRules;
+    var num = rules.length;
+    var updates = 0;
+    for (var i = 0; i < num; i++)
+    {
+        var rule = rules[i];
+        if (rule.selectorText == name)
+        {
+            rule.style["color"] = hex;
+            updates++;
+        }
+        else if (rule.selectorText == name+"_swatch")
+        {
+            rule.style["background"] = hex;
+            updates++;
+        }
+        if (updates == 2)
+        {
+            return;
+        }
+    }
+}
+
+function UpdateSytaxStyles(index)
+{
+    var hex = g_asColors[index].color;
+    var num = g_asSyntaxElements.length;
+    for (var i = 0; i < num; i++)
+    {
+        if (g_asSyntaxElements[i].color == index)
+        {
+            UpdateRuleColor("."+g_asSyntaxElements[i].name, hex);
+        }
+    }
+}
+
+function UpdateColorStyle(index)
+{
+    var hex = g_asColors[index].color;
+	var selectorText = ColorStyleName(index);
+    UpdateRuleColor(selectorText, hex);
+    UpdateSytaxStyles(index);
+}
+
+function ActivateColorSwatch(index)
+{
+	var swatch = document.getElementById("color_"+index);
+	if (swatch)
+	{
+		console.log(swatch);
+		swatch.classList.add("active");
+	}
+
+    SetSliders(g_asColors[index].color);
+}
+
+function DeactivateColorSwatch(index)
+{
+	var swatch = document.getElementById("color_"+index);
+	if (swatch)
+	{
+		console.log(swatch);
+		swatch.classList.remove("active");
+	}
+}
+
+var g_currentColor = -1;
+function SetActiveColor(index)
+{
+	DeactivateColorSwatch(g_currentColor);
+	g_currentColor = index;
+	console.log("ActiveColor: ", g_currentColor);
+	ActivateColorSwatch(index);
+}
+
+</script>
+<style>
+body {
+	font-family: "Arial", "Noto Sans", sans-serif;
+	color: #dcdccc;
+	background: #161616;
+}
+.slider {
+    width: 512px;
+    height: 32px;
+}
+.swatch {
+	color: #161616;
+	display: inline-block;
+	margin: 6px;
+	padding: 6px;
+	width: 80px;
+	height: 80px;
+	text-align: center;
+}
+.active {
+	border: 4px dotted #000000;
+	margin: 2px;
+}
+.code {
+	font-family: "Noto Sans Mono", monospace;
+}
+.indent {
+	margin-left: 3em;
+}
+</style>
+</head>
+<body class="bg" onload="ApplyColors()">
+
+<h1>Swatches</h1>
+<div id="ColorPanel"></div>
+<div>
+    <input class="slider" id="hue" type="range" min="0" max="360" value="0" oninput="UpdateColor();"/>
+    <input class="slider" id="sat" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/>
+    <input class="slider" id="lum" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/>
+</div>
+
+<h1>Syntax</h1>
+<div id="SyntaxPanel"></div>
+
+<h1>Scheme Preview</h1>
+
+<div class="code fg bg">
+<div><span class="Include">#include </span><span class="String">&lt;something.h&gt;</span></div>
+<div><span class="PreProc">#define STRINGIFY(x) ##x</span></div>
+<div class="Comment">// Comment comment, something comment</div>
+<div class="Comment">/* Comment comment comment comment */</div>
+<div><span class="Type">float</span> fSomething = <span class="Float">0.0f</span>;</div>
+<div><span class="Type">int</span> <span>main</span>(<span class="Type">int</span> <span>argc</span>, <span class="Type">char</span><span>**</span> <span>argv</span>)</div>
+<div>{</div>
+<div class="indent">
+	<div><span class="Statement">for</span>(<span class="Type">int</span> i = <span class="Number">0</span>; i &lt; something; i++)</div>
+	<div>{</div>
+	<div class="indent">
+		<div><span class="Conditional">if</span> (<span class="Constant">true</span>)</span></div>
+		<div>{</div>
+		<div class="indent">
+			<div><span>printf</span>(<span class="String">"Hello, world!\n"</span>);</div>
+		</div>
+		<div>}</div>
+	</div>
+	<div>}</div>
+	<div><span class="Conditional">switch</span>(something)</div>
+	<div>{</div>
+	<div class="indent">
+		<div><span class="Label">default:</span></div>
+		<div><span class="Label">case</span> <span class="Number">0</span>:</div>
+	</div>
+	<div>}</div>
+	<div><span class="Statement">return</span> <span class="Number">0</span>;</div>
+</div>
+<div>}</div>
+</div>
+</body>
+</html>
