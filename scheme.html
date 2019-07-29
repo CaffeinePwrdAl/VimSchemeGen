@@ -1,155 +1,112 @@
 <html>
 <head>
 <title>Vim Color Scheme Editor</title>
+<script src="colourmaths.js"></script>
 <script>
 
-function ToHex(rgb)
+function NormaliseLuminance(ref, rgb)
 {
-	console.log("RGB, ", rgb);
-	console.log("R, G, B, ", rgb.r, rgb.g, rgb.b);
-	var intr = Math.floor(rgb.r * 255);
-	var intg = Math.floor(rgb.g * 255);
-	var intb = Math.floor(rgb.b * 255);
-	console.log(intr, intg, intb);
+	console.log("NormaliseLuminance: ", ref, rgb);
 
-	return "#" + ((1<<24) | (intr<<16) | (intg<<8) | intb).toString(16).substr(1);
-}
+	var lrgb = lRGB(rgb);
+	console.log("NormaliseLuminance: ", lrgb);
+	
+	var lum = Luminance(lrgb);
+	console.log("NormaliseLuminance: ", lum);
 
-function ToFloat(hex)
-{
-	var numpart = hex.substring(1);
-	var r = parseInt(numpart.substring(0,2), 16) / 255.0;
-	var g = parseInt(numpart.substring(2,4), 16) / 255.0;
-	var b = parseInt(numpart.substring(4,6), 16) / 255.0;
-	return {r, g, b};
-}
+	var scale = ref / lum;
+	lrgb.r = lrgb.r * scale;
+	lrgb.g = lrgb.g * scale;
+	lrgb.b = lrgb.b * scale;
 
-function Linearise(c)
-{
-	if (c <= 0.0031308)
+	if (lrgb.r > 1.0 || lrgb.g > 1.0 || lrgb.b > 1.0)
 	{
-		return 12.92 * c;
+		var max = Math.max(lrgb.r, lrgb.g, lrgb.b);
+		var newRef = (scale * (1.0 / max)) * lum;
+		//printf("Normalisation too high... (Try lum': %f)<br>", newRef);
+		lrgb.r = Clamp(lrgb.r, 0.0, 1.0);
+		lrgb.g = Clamp(lrgb.g, 0.0, 1.0);
+		lrgb.b = Clamp(lrgb.b, 0.0, 1.0);
+		//printf("Clamped: <%f, %f, %f>\n", lrgb.r, lrgb.g, lrgb.b);
+	}
+
+	return sRGB(lrgb);
+}
+
+function NormaliseSaturation(ref, rgb)
+{
+	var lrgb = lRGB(rgb);
+	console.log("LRGB: ", lrgb);
+	var hsl = RGBToHSL(lrgb);
+	console.log("HSL: ", hsl);
+	hsl.s = ref;
+	console.log("HSL': ", hsl);
+	var rgbn = sRGB(HSLToRGB(hsl.h, hsl.s, hsl.l));
+	console.log("sRGB: ", rgbn);
+	return rgbn;
+
+
+	var l = Luminance(lrgb);
+
+	console.log("NormaliseSaturation: ", lrgb, hsl);
+
+	if (hsl.s == 0) return rgb;
+
+	// Difference from grey of same luminance
+	var delta = {r: lrgb.r - l, g: lrgb.g - l, b: lrgb.b - l};
+
+	console.log("Delta from grey: ", delta);
+
+	// Take min max colour channel
+	var maxdelta = Math.max(delta.r, Math.max(delta.g, delta.b));
+	var mindelta = -Math.min(delta.r, Math.min(delta.g, delta.b));
+
+	console.log("Max/Min Delta: ", mindelta, maxdelta);
+
+	console.assert(maxdelta >= 0 && mindelta >= 0, "Can't adjust saturation of grey");
+
+	//printf("min/max: %f / %f<br>", mindelta, maxdelta);
+
+	// Take the delta between grey and current colour and scale
+	// so that sat of 1.0 scales the colour just up to it clipping
+	// at 0.0 or 1.0f (so the hue isn't altered)
+	var headroom = (1.0 - l);
+	var floorspace = (l);
+
+	console.log("Headroom / floorspace: ", headroom / maxdelta, floorspace / mindelta);
+	if (headroom / maxdelta < floorspace / mindelta)
+	{
+		//printf("Headroom...<br>");
+		delta.r *= headroom / maxdelta;
+		delta.g *= headroom / maxdelta;
+		delta.b *= headroom / maxdelta;
 	}
 	else
 	{
-		return 1.055 * Math.pow(c, 1.0 / 2.4) - 0.055;
-	}
-}
-
-function GammaCorrect(c)
-{
-	if (c <= 0.04045)
-	{
-		return c / 12.92;
-	}
-	else
-	{
-		return Math.pow((c + 0.055)/1.055, 2.4);
-	}
-}
-
-//-----------------------------------------------------------------------
-// Calculate perceptual luminance of colour
-//-----------------------------------------------------------------------
-function Luminance(c)
-{
-	// Rec.709 D65
-	return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-}
-
-//-----------------------------------------------------------------------
-// Calculates an RGB colour from HSL
-//-----------------------------------------------------------------------
-function RGBToHSL(c)
-{
-    var max = Math.max(c.r, c.g, c.b);
-    var min = Math.min(c.r, c.g, c.b);
-	var range = max - min;
-
-    var h, s, l;
-	if (c.r == c.g && c.g == c.b)
-	{
-		h = 0;
-	}
-	else if (c.r == max)
-	{
-		h = (c.g - c.b) / range;
-	}
-	else if (c.g == max)
-	{
-		h = 2.0 + (c.b - c.r) / range;
-	}
-	else
-	{
-		h = 4.0 + (c.r - c.g) / range;
+		//printf("Floorspace...<br>");
+		delta.r *= floorspace / mindelta;
+		delta.g *= floorspace / mindelta;
+		delta.b *= floorspace / mindelta;
 	}
 
-    h = (h * 60.0 + 360.0) % 360.0;
+	console.log("Delta: ", delta.r, delta.g, delta.b);
 
-    l = (max + min) / 2.0;
+	// 0 == grey
+	// 1 == stretch colour so max delta from grey is stretched to 1.0
+	lrgb = {
+		r: l + delta.r * sat,
+		g: l + delta.g * sat,
+		b: l + delta.b * sat
+	};
+	
+	//printf("colour': %f %f %f<br>", lrgb.r, lrgb.g, lrgb.b);
 
-    if (min == 1 || max == 0)
-    {
-        s = 0;
-    }
-    else
-    {
-        s = (max - l) / Math.min(l, 1 - l);
-    }
+	//printf("hue': %2.0f<br>", hue(lrgb));
+	//normaliseLuminance(l);
+	//printf("colour'': %f %f %f<br>", lrgb.r, lrgb.g, lrgb.b);
+	//printf("hue'': %2.0f<br>", hue(lrgb));
 
-    return {h, s, l};
-}
-function HSLToRGB(h, s, l)
-{
-	var C = (1.0 - Math.abs(2.0 * l - 1.0)) * s;
-	var X = C * (1.0 - Math.abs( ((h / 60.0) % 2.0) - 1.0));
-	var m = l - C / 2.0;
-
-	var r, g, b;
-	if (h < 60)				r = C, g = X, b = 0;
-	else if (h < 120)		r = X, g = C, b = 0;
-	else if (h < 180)		r = 0, g = C, b = X;
-	else if (h < 240)		r = 0, g = X, b = C;
-	else if (h < 300)		r = X, g = 0, b = C;
-	else					r = C, g = 0, b = X;
-
-	r += m;	g += m;	b += m;
-
-  //  r = GammaCorrect(r);
-    //g = GammaCorrect(g);
-    //b = GammaCorrect(b);
-
-	return {r, g, b};
-}
-
-function SetSliders(hex)
-{
-    var rgb = ToFloat(hex);
-    //rgb.r = Linearise(rgb.r);
-    //rgb.g = Linearise(rgb.g);
-    //rgb.b = Linearise(rgb.b);
-    var hsl = RGBToHSL(rgb);
-
-    console.log("SetSliders: ", hex, rgb, hsl);
-
-    document.getElementById("hue").value = hsl.h;
-    document.getElementById("sat").value = hsl.s * 255;
-    document.getElementById("lum").value = hsl.l * 255;
-}
-
-function UpdateColor()
-{
-    var h = document.getElementById("hue").value;
-    var s = document.getElementById("sat").value / 255.0;
-    var l = document.getElementById("lum").value / 255.0;
-
-    var rgb = HSLToRGB(h, s, l);
-    var hex = ToHex(rgb);
-
-    g_asColors[g_currentColor].color = hex;
-
-    console.log("Update Colour: ", hex, rgb, h, s, l);
-    UpdateColorStyle(g_currentColor);
+	return sRGB(lrgb);
 }
 
 var g_asBackground = { name: "bg",		color: "#161616" };
@@ -289,7 +246,7 @@ function UpdateRuleColor(name, hex)
     }
 }
 
-function UpdateSytaxStyles(index)
+function UpdateSyntaxStyles(index)
 {
     var hex = g_asColors[index].color;
     var num = g_asSyntaxElements.length;
@@ -307,7 +264,7 @@ function UpdateColorStyle(index)
     var hex = g_asColors[index].color;
 	var selectorText = ColorStyleName(index);
     UpdateRuleColor(selectorText, hex);
-    UpdateSytaxStyles(index);
+    UpdateSyntaxStyles(index);
 }
 
 function ActivateColorSwatch(index)
@@ -339,6 +296,57 @@ function SetActiveColor(index)
 	g_currentColor = index;
 	console.log("ActiveColor: ", g_currentColor);
 	ActivateColorSwatch(index);
+}
+
+function SetSliders(hex)
+{
+    var rgb = ToFloat(hex);
+    var hsl = RGBToHSL(rgb);
+
+    console.log("SetSliders: ", hex, rgb, hsl);
+
+    document.getElementById("hue").value = hsl.h;
+    document.getElementById("sat").value = hsl.s * 255;
+    document.getElementById("lum").value = hsl.l * 255;
+}
+
+function UpdateColor()
+{
+    var h = document.getElementById("hue").value;
+    var s = document.getElementById("sat").value / 255.0;
+    var l = document.getElementById("lum").value / 255.0;
+
+    var rgb = HSLToRGB(h, s, l);
+    var hex = ToHex(rgb);
+
+    g_asColors[g_currentColor].color = hex;
+
+    console.log("Update Colour: ", hex, rgb, h, s, l);
+    UpdateColorStyle(g_currentColor);
+}
+
+function GlobalLuminance(refstr)
+{
+	var ref = parseFloat(refstr);
+	var num = g_asColors.length;
+	for (var i = 0; i < num; i++)
+	{
+		var rgb = NormaliseLuminance(ref, ToFloat(g_asColors[i].color));
+		g_asColors[i].color = ToHex(rgb);
+		UpdateColorStyle(i);
+	}
+}
+
+function GlobalSaturation(refstr)
+{
+	var ref = parseFloat(refstr);
+	var num = g_asColors.length;
+	for (var i = 0; i < num; i++)
+	{
+		var rgb = NormaliseSaturation(ref, ToFloat(g_asColors[i].color));
+		g_asColors[i].color = ToHex(rgb);
+		UpdateColorStyle(i);
+	}
 }
 
 </script>
@@ -467,8 +475,8 @@ h1 {
 	</fieldset>
 	<fieldset class="sliders">
 		<h3>Global Adjustment</h3>
-		<p><label for="sat">Global Saturation</label><input class="slider" id="sat" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/></p>
-		<p><label for="lum">Global Luminance</label><input class="slider" id="lum" type="range" min="0" max="255" value="0" oninput="UpdateColor();"/></p>
+		<p><label for="glosat">Global Saturation</label><input class="slider" id="glosat" type="range" min="0" max="1.0" step="0.01" value="0.5" oninput="GlobalSaturation(value);"/></p>
+		<p><label for="glolum">Global Luminance</label><input class="slider" id="glolum" type="range" min="0" max="1.0" step="0.01" value="0.5" oninput="GlobalLuminance(value);"/></p>
 	</fieldset>
 	<div class="clear"></div>
 </div></div>
